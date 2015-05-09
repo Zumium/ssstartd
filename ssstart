@@ -1,0 +1,27 @@
+#! /usr/bin/python3
+
+import socket
+import sys
+
+def init_socket():
+	s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+	s.bind(('127.0.0.1',6566))
+	return s
+
+def main():
+	op=sys.argv[1]
+	s=init_socket()
+	SERVER=('127.0.0.1',6565)
+	if op=='quit':
+		s.sendto("Quit".encode('UTF-8'),SERVER)
+		print("Shadowsocks Quit\n")
+	elif op=='close':
+		s.sendto("Close".encode('UTF-8'),SERVER)
+		print("Shadowsocks Close\n")
+	else:
+		s.sendto("Change {0}".format(op).encode('UTF-8'),SERVER)
+		print("Server changed to {0}\n".format(op))
+	s.close()
+
+if __name__=='__main__':
+	main()

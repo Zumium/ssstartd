@@ -1,0 +1,81 @@
+#! /usr/bin/env python3
+
+import sys
+import os
+import socket
+import signal
+
+child_pid=0
+cmd_recever=None
+
+def read_config(config_path):
+	name="config_name"
+	ip="server"
+	port="server_port"
+	password="password"
+	method="method"
+	configs=[]
+	config_file=open(config_path,'r')
+
+	all_lines=config_file.read().split('\n')
+	del all_lines[len(all_lines)-1]
+	
+	for oneline in all_lines :
+		line_data=oneline.split()
+		configs.append({name:line_data[0],'config':{ip:line_data[1],port:line_data[2],password:line_data[3],method:line_data[4]}})
+
+	config_file.close()
+	configs={oneline[name]:oneline['config'] for oneline in configs}
+	return configs
+
+def main_loop(configs):
+	global cmd_recever
+	global child_pid
+	cache='vultr'
+	cache_split=[]
+	child_pid=change_to(configs[cache])
+	while 1:
+		cache=cmd_recever.recv(50).decode('UTF-8')
+		cache_split=cache.split()
+		if cache_split[0]=='Change':
+			new_server=cache_split[1]
+			if child_pid!=0:
+				os.kill(child_pid,signal.SIGINT)
+				os.wait()
+			child_pid=change_to(configs[new_server])
+		elif cache_split[0]=='Quit':
+			program_quit()
+		elif cache_split[0]=='Close':
+			if child_pid!=0:
+				os.kill(child_pid,signal.SIGINT)
+				os.wait()
+			child_pid=0
+
+def init():
+	global cmd_recever
+	config_path=sys.argv[1]
+	if not config_path:
+		print("Empty config path!\n")
+		exit()
+	configs=read_config(config_path)
+	cmd_recever=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+	cmd_recever.bind(('127.0.0.1',6565))
+	main_loop(configs)
+
+def change_to(server_config):
+	pid=os.fork()
+	if pid==0:
+		os.execv('/usr/local/bin/sslocal',['','-s',server_config['server'],'-p',server_config['server_port'],'-k',server_config['password'],'-m',server_config['method']])
+	return pid
+
+def program_quit():
+	global child_pid
+	global cmd_recever
+	os.kill(child_pid,signal.SIGINT)
+	os.wait()
+	cmd_recever.close()
+	exit()
+	
+
+if __name__=='__main__':
+	init()
